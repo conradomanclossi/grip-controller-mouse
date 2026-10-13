@@ -9,12 +9,13 @@ use core_graphics::geometry::CGPoint;
 use gilrs::{Axis, Button, EventType, GamepadId, Gilrs};
 
 use crate::config::Config;
-use crate::mapping::{Action, KeyCombo};
+use crate::mapping::{Action, BUTTON_NAMES, KeyCombo};
 use crate::motion::{Accumulator, shape};
 use crate::output::Output;
 
 const TICK: Duration = Duration::from_millis(8);
 const IDLE_WAIT: Duration = Duration::from_millis(500);
+const LIVE_INTERVAL: Duration = Duration::from_millis(33);
 
 /// Messages from the input thread to the UI.
 #[derive(Debug, Clone)]
@@ -22,11 +23,23 @@ pub enum Status {
     Connected(String),
     Disconnected,
     Enabled(bool),
+    /// Raw controller state for the settings window's test view.
+    Live(Live),
+}
+
+#[derive(Debug, Clone, PartialEq, serde::Serialize)]
+pub struct Live {
+    /// Left X, left Y, right X, right Y in -1.0..=1.0 (Y up-positive).
+    pub sticks: [f32; 4],
+    /// Config names of the buttons currently held.
+    pub pressed: Vec<&'static str>,
 }
 
 /// State shared between the tray (main thread) and the input thread.
 pub struct Shared {
     pub enabled: AtomicBool,
+    /// Set while the settings window is open, to stream `Status::Live`.
+    pub ui_open: AtomicBool,
     config: RwLock<Arc<Config>>,
     speed_bits: AtomicU32,
 }
@@ -35,6 +48,7 @@ impl Shared {
     pub fn new(config: Config) -> Arc<Shared> {
         Arc::new(Shared {
             enabled: AtomicBool::new(true),
+            ui_open: AtomicBool::new(false),
             config: RwLock::new(Arc::new(config)),
             speed_bits: AtomicU32::new(1.0f32.to_bits()),
         })
@@ -75,6 +89,7 @@ struct Engine {
     scroll_acc: Accumulator,
     last_tick: Instant,
     was_enabled: bool,
+    last_live: Option<(Instant, Live)>,
 }
 
 pub fn run(shared: Arc<Shared>, notify: impl Fn(Status) + Send + 'static) -> anyhow::Result<()> {
@@ -90,6 +105,7 @@ pub fn run(shared: Arc<Shared>, notify: impl Fn(Status) + Send + 'static) -> any
         cursor: None,
         scroll_acc: Accumulator::default(),
         last_tick: Instant::now(),
+        last_live: None,
     };
 
     if let Some((id, gp)) = gilrs.gamepads().next() {
@@ -129,6 +145,9 @@ impl Engine {
     }
 
     fn is_busy(&self, gilrs: &Gilrs) -> bool {
+        if self.shared.ui_open.load(Ordering::Relaxed) {
+            return true;
+        }
         if !self.enabled() {
             return false;
         }
@@ -230,6 +249,31 @@ impl Engine {
         self.scroll_acc.reset();
     }
 
+    fn send_live(&mut self, gilrs: &Gilrs, now: Instant) {
+        if !self.shared.ui_open.load(Ordering::Relaxed) {
+            self.last_live = None;
+            return;
+        }
+        if self.last_live.as_ref().is_some_and(|(t, _)| now - *t < LIVE_INTERVAL) {
+            return;
+        }
+        let gp = self.active.and_then(|id| gilrs.connected_gamepad(id));
+        let live = Live {
+            sticks: self.sticks(gilrs).map(|v| (v * 1000.0).round() / 1000.0),
+            pressed: BUTTON_NAMES
+                .iter()
+                .filter(|(_, b)| gp.as_ref().is_some_and(|gp| gp.is_pressed(*b)))
+                .map(|(n, _)| *n)
+                .collect(),
+        };
+        // Only send changes, but resend at least once a second so a fresh window fills in.
+        let stale = self.last_live.as_ref().is_none_or(|(t, l)| *l != live || now - *t > Duration::from_secs(1));
+        if stale {
+            (self.notify)(Status::Live(live.clone()));
+            self.last_live = Some((now, live));
+        }
+    }
+
     fn holding(&self, action: &Action) -> bool {
         self.pressed.values().any(|a| a == action)
     }
@@ -238,6 +282,7 @@ impl Engine {
         let now = Instant::now();
         let dt = (now - self.last_tick).as_secs_f64().min(0.05);
         self.last_tick = now;
+        self.send_live(gilrs, now);
 
         let enabled = self.enabled();
         if self.was_enabled && !enabled {

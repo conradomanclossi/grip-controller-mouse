@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
-# Builds target/ControllerMouse.app (menu bar only, ad-hoc signed).
-# Usage: scripts/bundle.sh [bin-name]   (default: controller-mouse; "probe" bundles the gamepad probe)
+# Builds target/Grip.app (menu bar only, ad-hoc signed).
+# Usage: scripts/bundle.sh [bin-name]   (default: grip; "probe" bundles the gamepad probe)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-BIN="${1:-controller-mouse}"
+BIN="${1:-grip}"
 if [[ "$BIN" == "probe" ]]; then
   cargo build --release --example probe
-  SRC="target/release/examples/probe"; NAME="ControllerMouseProbe"; ID="dev.conrado.controller-mouse.probe"
+  SRC="target/release/examples/probe"; NAME="GripProbe"; ID="dev.conrado.grip.probe"
 else
   cargo build --release
-  SRC="target/release/$BIN"; NAME="ControllerMouse"; ID="dev.conrado.controller-mouse"
+  SRC="target/release/$BIN"; NAME="Grip"; ID="dev.conrado.grip"
 fi
 
 APP="target/$NAME.app"
@@ -25,7 +25,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 <plist version="1.0">
 <dict>
   <key>CFBundleName</key><string>$NAME</string>
-  <key>CFBundleDisplayName</key><string>Controller Mouse</string>
+  <key>CFBundleDisplayName</key><string>GRIP.</string>
   <key>CFBundleIdentifier</key><string>$ID</string>
   <key>CFBundleExecutable</key><string>$NAME</string>
   <key>CFBundlePackageType</key><string>APPL</string>

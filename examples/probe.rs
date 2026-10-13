@@ -1,13 +1,13 @@
 //! Prints every gilrs event with a timestamp. Use it to check that the controller is
 //! seen at all, and (bundled via `scripts/bundle.sh probe`) that events still arrive
-//! while another app is focused. Logs to stdout and /tmp/controller-mouse-probe.log.
+//! while another app is focused. Logs to stdout and /tmp/grip-probe.log.
 
 use std::io::Write;
 use std::time::Instant;
 
 fn main() {
     let mut gilrs = gilrs::Gilrs::new().expect("gilrs init");
-    let mut log = std::fs::File::create("/tmp/controller-mouse-probe.log").expect("log file");
+    let mut log = std::fs::File::create("/tmp/grip-probe.log").expect("log file");
     let start = Instant::now();
     let mut out = |line: String| {
         println!("{line}");

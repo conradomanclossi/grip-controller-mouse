@@ -1,0 +1,858 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GRIP.</title>
+<style>
+  :root {
+    --bg: #ededed;
+    --paper: #f6f6f6;
+    --ink: #0b0b0b;
+    --muted: #6f6f6f;
+    --faint: #c9c9c9;
+    --invert-ink: #ffffff;
+    --accent: #ff6a13; /* the orange tee in the reference — used once, for "live" */
+    --rule: 1px solid var(--ink);
+    --head: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    --wide: system-ui, -apple-system, "Arial Black", sans-serif;
+    --body: -apple-system, system-ui, "Helvetica Neue", sans-serif;
+    --mono: ui-monospace, "SF Mono", Menlo, monospace;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #121212;
+      --paper: #1a1a1a;
+      --ink: #f1f1f1;
+      --muted: #9a9a9a;
+      --faint: #3a3a3a;
+      --invert-ink: #0b0b0b;
+      color-scheme: dark;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font: 13px/1.4 var(--body);
+    -webkit-font-smoothing: antialiased;
+    display: flex;
+    flex-direction: column;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  button, select, input { font: inherit; color: inherit; }
+
+  /* ── Masthead ─────────────────────────────────────────── */
+  .mast {
+    border-top: var(--rule);
+    border-bottom: var(--rule);
+    margin-top: 18px;
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: end;
+  }
+  .brand {
+    font: 800 76px/0.86 var(--head);
+    letter-spacing: -0.035em;
+    padding: 10px 28px 4px;
+    margin: 0;
+  }
+  .mast-side {
+    display: flex;
+    gap: 0;
+    align-self: stretch;
+    border-left: var(--rule);
+  }
+  .tag {
+    margin: 0 28px;
+    padding: 10px 0 14px 12px;
+    border-left: var(--rule);
+    display: grid;
+    grid-template-columns: 1fr auto;
+    gap: 12px;
+    align-items: end;
+  }
+  .tag p { margin: 0; font-size: 13px; line-height: 1.25; }
+  .controller {
+    font: 500 12px var(--body);
+    text-align: right;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+  .controller b { color: var(--ink); font-weight: 600; }
+  .dot { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: var(--faint); margin-right: 6px; vertical-align: 1px; }
+  .dot.on { background: var(--accent); }
+
+  /* ON / OFF block switch */
+  .power {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    min-width: 150px;
+  }
+  .power button {
+    border: 0;
+    background: transparent;
+    font: 800 15px var(--head);
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    padding: 0 18px;
+  }
+  .power button + button { border-left: var(--rule); }
+  .power button[aria-pressed="true"] { background: var(--ink); color: var(--invert-ink); }
+
+  /* ── Banner ───────────────────────────────────────────── */
+  .banner {
+    display: none;
+    margin: 0 28px;
+    border: var(--rule);
+    border-top: 0;
+    background: var(--ink);
+    color: var(--invert-ink);
+    padding: 10px 14px;
+    align-items: center;
+    gap: 12px;
+    font-weight: 600;
+  }
+  .banner.show { display: flex; }
+  .banner span { flex: 1; }
+  .banner button {
+    background: var(--invert-ink);
+    color: var(--ink);
+    border: 0;
+    padding: 6px 12px;
+    font: 700 12px var(--head);
+    letter-spacing: 0.04em;
+    cursor: pointer;
+  }
+
+  /* ── Tabs: bordered grid like the reference's category nav ── */
+  .tabs {
+    margin: 14px 28px 0;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    border: var(--rule);
+  }
+  .tabs button {
+    background: transparent;
+    border: 0;
+    padding: 10px 0;
+    font: 500 12px var(--body);
+    letter-spacing: 0.02em;
+    cursor: pointer;
+  }
+  .tabs button + button { border-left: var(--rule); }
+  .tabs button[aria-selected="true"] { background: var(--ink); color: var(--invert-ink); font-weight: 600; }
+
+  /* ── Scrolling body ───────────────────────────────────── */
+  main {
+    flex: 1;
+    overflow-y: auto;
+    padding: 0 28px 28px;
+  }
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  .section {
+    border: var(--rule);
+    border-top: 0;
+    background: var(--paper);
+  }
+  .section-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 18px 16px 10px;
+    border-bottom: var(--rule);
+  }
+  h2 {
+    margin: 0;
+    font: 900 26px/1 var(--wide);
+    font-stretch: 150%;
+    letter-spacing: 0.01em;
+    text-transform: uppercase;
+  }
+  .kicker { font: 400 13px var(--body); color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+
+  .split { display: grid; grid-template-columns: 1fr 210px; }
+  .split > .viz { border-left: var(--rule); display: grid; place-items: center; padding: 12px; }
+
+  /* Rows */
+  .row {
+    display: grid;
+    grid-template-columns: 150px 1fr 92px;
+    align-items: center;
+    gap: 14px;
+    padding: 11px 16px;
+    border-bottom: 1px solid var(--faint);
+  }
+  .row:last-child { border-bottom: 0; }
+  .row label { font-weight: 500; }
+  .row .hint { display: block; font-size: 11px; color: var(--muted); font-weight: 400; }
+  .val { font: 12px var(--mono); text-align: right; white-space: nowrap; }
+
+  /* Range: hairline track, square thumb */
+  input[type=range] {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 18px;
+    background: transparent;
+    cursor: pointer;
+  }
+  input[type=range]::-webkit-slider-runnable-track {
+    height: 1px;
+    background: linear-gradient(to right, var(--ink) var(--fill, 50%), var(--faint) var(--fill, 50%));
+  }
+  input[type=range]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px; height: 14px;
+    margin-top: -6.5px;
+    background: var(--ink);
+    border: 0;
+    border-radius: 0;
+  }
+  input[type=range]:focus-visible::-webkit-slider-thumb { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* Square checkbox toggle */
+  .check {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+  }
+  .check input { appearance: none; -webkit-appearance: none; width: 16px; height: 16px; border: var(--rule); margin: 0; display: grid; place-items: center; cursor: pointer; }
+  .check input:checked { background: var(--ink); }
+  .check input:checked::after { content: ""; width: 6px; height: 6px; background: var(--paper); }
+
+  /* ── Buttons tab ──────────────────────────────────────── */
+  .map {
+    display: grid;
+    grid-template-columns: 52px 1fr 170px 1fr;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 16px;
+    border-bottom: 1px solid var(--faint);
+  }
+  .map:last-child { border-bottom: 0; }
+  .chip {
+    width: 40px; height: 28px;
+    border: var(--rule);
+    display: grid; place-items: center;
+    font: 800 12px var(--head);
+    letter-spacing: 0.02em;
+    transition: background 60ms, color 60ms;
+  }
+  .chip.down { background: var(--ink); color: var(--invert-ink); }
+  .map .name { font-weight: 500; }
+  .map .name small { display: block; color: var(--muted); font-weight: 400; font-size: 11px; }
+  select {
+    -webkit-appearance: none;
+    appearance: none;
+    border: var(--rule);
+    border-radius: 0;
+    background: transparent url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6'><path d='M0 0l5 6 5-6z' fill='%23777'/></svg>") no-repeat right 10px center;
+    padding: 6px 28px 6px 10px;
+    width: 100%;
+    cursor: pointer;
+  }
+  .combo { display: flex; gap: 0; }
+  .combo input {
+    flex: 1;
+    min-width: 0;
+    border: var(--rule);
+    border-radius: 0;
+    background: transparent;
+    padding: 6px 8px;
+    font: 12px var(--mono);
+    user-select: text;
+    -webkit-user-select: text;
+  }
+  .combo input:disabled { border-color: var(--faint); color: var(--faint); }
+  .combo input.bad { border-color: #d0021b; color: #d0021b; }
+  .rec {
+    border: var(--rule);
+    border-left: 0;
+    background: transparent;
+    padding: 0 10px;
+    font: 700 11px var(--head);
+    letter-spacing: 0.06em;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .rec:disabled { border-color: var(--faint); color: var(--faint); cursor: default; }
+  .rec.on { background: var(--accent); border-color: var(--accent); color: #000; }
+  .note { padding: 10px 16px 14px; color: var(--muted); font-size: 12px; }
+
+  /* ── Test tab ─────────────────────────────────────────── */
+  .sticks { display: grid; grid-template-columns: 1fr 1fr; }
+  .sticks > div { padding: 18px 16px 16px; display: grid; justify-items: center; gap: 10px; }
+  .sticks > div + div { border-left: var(--rule); }
+  .stick-label { font: 700 12px var(--head); letter-spacing: 0.08em; text-transform: uppercase; }
+  .readout { font: 11px var(--mono); color: var(--muted); }
+  .pad {
+    display: grid;
+    grid-template-columns: repeat(6, 1fr);
+    border-top: var(--rule);
+  }
+  .pad .cell {
+    padding: 12px 6px 10px;
+    display: grid;
+    justify-items: center;
+    gap: 6px;
+    border-right: 1px solid var(--faint);
+    border-bottom: 1px solid var(--faint);
+    min-width: 0;
+  }
+  .pad .cell:nth-child(6n) { border-right: 0; }
+  .pad .cell small { font-size: 10px; color: var(--muted); text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100%; }
+  .empty {
+    padding: 38px 16px;
+    text-align: center;
+  }
+  .empty h2 { font-size: 22px; margin-bottom: 8px; }
+  .empty p { margin: 0; color: var(--muted); }
+
+  /* ── Footer ───────────────────────────────────────────── */
+  footer {
+    border-top: var(--rule);
+    display: grid;
+    grid-template-columns: auto auto 1fr auto;
+    align-items: stretch;
+    background: var(--bg);
+  }
+  footer button {
+    background: transparent;
+    border: 0;
+    border-right: var(--rule);
+    padding: 14px 20px;
+    font: 700 12px var(--head);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    cursor: pointer;
+  }
+  footer .msg { align-self: center; padding: 0 16px; font-size: 12px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  footer .msg.err { color: #d0021b; white-space: normal; }
+  footer .save {
+    border-right: 0;
+    border-left: var(--rule);
+    background: var(--ink);
+    color: var(--invert-ink);
+    font: 800 16px var(--head);
+    padding: 14px 36px;
+    letter-spacing: 0.03em;
+  }
+  footer .save:disabled { background: transparent; color: var(--faint); cursor: default; }
+  footer .link { color: var(--muted); }
+
+  @media (max-width: 680px) {
+    .brand { font-size: 56px; }
+    .split { grid-template-columns: 1fr; }
+    .split > .viz { border-left: 0; border-top: var(--rule); }
+    .row { grid-template-columns: 110px 1fr 76px; }
+    .map { grid-template-columns: 48px 1fr 150px; }
+    .map .combo { grid-column: 2 / -1; }
+    .pad { grid-template-columns: repeat(4, 1fr); }
+    .pad .cell:nth-child(6n) { border-right: 1px solid var(--faint); }
+    .pad .cell:nth-child(4n) { border-right: 0; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="mast">
+    <h1 class="brand">GRIP.</h1>
+    <div class="mast-side">
+      <div class="power" role="group" aria-label="Controller input">
+        <button id="on" aria-pressed="true">ON</button>
+        <button id="off" aria-pressed="false">OFF</button>
+      </div>
+    </div>
+  </div>
+  <div class="tag">
+    <p>game controller<br>mouse for macOS.</p>
+    <div class="controller" id="controller"><span class="dot"></span>No controller</div>
+  </div>
+  <div class="banner" id="banner">
+    <span>Accessibility permission needed. GRIP. can't move the pointer or press keys until it's granted.</span>
+    <button id="grant">GRANT ACCESS</button>
+  </div>
+  <nav class="tabs" role="tablist">
+    <button role="tab" data-tab="move" aria-selected="true">Move</button>
+    <button role="tab" data-tab="buttons" aria-selected="false">Buttons</button>
+    <button role="tab" data-tab="test" aria-selected="false">Test</button>
+  </nav>
+</header>
+
+<main>
+  <!-- MOVE -->
+  <section class="panel active" id="panel-move">
+    <div class="section split">
+      <div>
+        <div class="section-head"><h2>Cursor</h2><span class="kicker">Left stick</span></div>
+        <div id="cursor-rows"></div>
+      </div>
+      <div class="viz">
+        <svg id="curve-cursor" width="180" height="180" viewBox="0 0 180 180" aria-label="Cursor response curve"></svg>
+      </div>
+    </div>
+    <div class="section split">
+      <div>
+        <div class="section-head"><h2>Scroll</h2><span class="kicker">Right stick</span></div>
+        <div id="scroll-rows"></div>
+      </div>
+      <div class="viz">
+        <svg id="curve-scroll" width="180" height="180" viewBox="0 0 180 180" aria-label="Scroll response curve"></svg>
+      </div>
+    </div>
+  </section>
+
+  <!-- BUTTONS -->
+  <section class="panel" id="panel-buttons">
+    <div class="section">
+      <div class="section-head"><h2>Mapping</h2><span class="kicker">Xbox-style layout</span></div>
+      <div id="map-rows"></div>
+      <p class="note">Shortcuts the system grabs first (⌘Tab, ⌘Space) can't be recorded. Type them in instead. Clicking both sticks always turns GRIP. on or off.</p>
+    </div>
+    <div class="section">
+      <div class="section-head"><h2>Key repeat</h2><span class="kicker">Keys without modifiers</span></div>
+      <div id="repeat-rows"></div>
+    </div>
+  </section>
+
+  <!-- TEST -->
+  <section class="panel" id="panel-test">
+    <div class="section">
+      <div class="section-head"><h2>Live</h2><span class="kicker">Move sticks · press buttons</span></div>
+      <div id="test-body"></div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <button id="defaults">Defaults</button>
+  <button id="revert">Revert</button>
+  <div class="msg" id="msg"></div>
+  <button class="save" id="save" disabled>SAVE</button>
+</footer>
+
+<script>
+(() => {
+  "use strict";
+
+  // ── Bridge ───────────────────────────────────────────────
+  // In the app, wry provides window.ipc. In a plain browser we fake the backend so the
+  // page can be previewed and designed without the app running.
+  const native = !!(window.ipc && window.ipc.postMessage);
+  const post = (msg) => native ? window.ipc.postMessage(JSON.stringify(msg)) : mock(msg);
+
+  // ── Static data ──────────────────────────────────────────
+  const BUTTONS = [
+    ["south", "A", "South", "A / ✕"],
+    ["east", "B", "East", "B / ○"],
+    ["west", "X", "West", "X / □"],
+    ["north", "Y", "North", "Y / △"],
+    ["left_bumper", "LB", "Left bumper", "LB / L1 / L"],
+    ["right_bumper", "RB", "Right bumper", "RB / R1 / R"],
+    ["left_trigger", "LT", "Left trigger", "LT / L2 / ZL"],
+    ["right_trigger", "RT", "Right trigger", "RT / R2 / ZR"],
+    ["dpad_up", "↑", "D-pad up", ""],
+    ["dpad_down", "↓", "D-pad down", ""],
+    ["dpad_left", "←", "D-pad left", ""],
+    ["dpad_right", "→", "D-pad right", ""],
+    ["start", "STA", "Start", "Menu / Options / +"],
+    ["select", "SEL", "Select", "View / Share / −"],
+    ["mode", "⌂", "Guide", "Xbox / PS / Home"],
+    ["left_thumb", "L3", "Left stick click", ""],
+    ["right_thumb", "R3", "Right stick click", ""],
+  ];
+  const ACTIONS = [
+    ["left_click", "Left click"],
+    ["right_click", "Right click"],
+    ["middle_click", "Middle click"],
+    ["precision", "Precision (hold)"],
+    ["turbo", "Turbo (hold)"],
+    ["toggle", "Toggle on / off"],
+    ["key", "Shortcut…"],
+    ["none", "Nothing"],
+  ];
+  const FIXED = new Set(ACTIONS.map(a => a[0]).filter(a => a !== "key"));
+
+  const SLIDERS = {
+    cursor: [
+      ["max_speed", "Speed", "full tilt", 200, 4000, 50, v => `${v} px/s`],
+      ["deadzone", "Deadzone", "ignored drift", 0, 0.5, 0.01, v => v.toFixed(2)],
+      ["exponent", "Curve", "1 = linear", 1, 4, 0.1, v => v.toFixed(1)],
+      ["precision_multiplier", "Precision", "while held", 0.05, 1, 0.05, v => `×${v.toFixed(2)}`],
+      ["turbo_multiplier", "Turbo", "while held", 1, 5, 0.1, v => `×${v.toFixed(1)}`],
+    ],
+    scroll: [
+      ["max_speed", "Speed", "full tilt", 100, 5000, 50, v => `${v} px/s`],
+      ["deadzone", "Deadzone", "ignored drift", 0, 0.5, 0.01, v => v.toFixed(2)],
+      ["exponent", "Curve", "1 = linear", 1, 4, 0.1, v => v.toFixed(1)],
+    ],
+    repeat: [
+      ["delay_ms", "Delay", "before repeating", 100, 1500, 10, v => `${v} ms`],
+      ["interval_ms", "Rate", "between repeats", 10, 300, 5, v => `${v} ms`],
+    ],
+  };
+
+  // ── State ────────────────────────────────────────────────
+  let saved = null;     // last config known to be on disk
+  let cfg = null;       // working copy
+  let defaults = null;
+  let live = { sticks: [0, 0, 0, 0], pressed: [] };
+  let controller = null;
+  let recording = null; // button name being recorded
+
+  const $ = (s, el = document) => el.querySelector(s);
+  const clone = (o) => JSON.parse(JSON.stringify(o));
+  const round = (v, step) => Math.round(v / step) * step;
+  const el = (tag, props = {}, ...kids) => {
+    const n = tag === "svg" ? document.createElementNS("http://www.w3.org/2000/svg", "svg") : document.createElement(tag);
+    for (const [k, v] of Object.entries(props)) {
+      if (k === "class") n.className = v;
+      else if (k.startsWith("on")) n.addEventListener(k.slice(2), v);
+      else if (v !== undefined && v !== null) n.setAttribute(k, v);
+    }
+    for (const kid of kids) n.append(kid);
+    return n;
+  };
+
+  // ── Rendering: MOVE / repeat sliders ─────────────────────
+  function sliderRows(group, container) {
+    container.replaceChildren();
+    for (const [key, label, hint, min, max, step, fmt] of SLIDERS[group]) {
+      const id = `${group}-${key}`;
+      const out = el("span", { class: "val" });
+      const input = el("input", { type: "range", id, min, max, step });
+      const sync = () => {
+        const v = cfg[group][key];
+        input.value = v;
+        out.textContent = fmt(Number(v));
+        input.style.setProperty("--fill", `${((v - min) / (max - min)) * 100}%`);
+      };
+      input.addEventListener("input", () => {
+        cfg[group][key] = Number(round(Number(input.value), step).toFixed(3));
+        sync();
+        changed();
+      });
+      sync();
+      container.append(el("div", { class: "row" },
+        el("label", { for: id }, label, el("span", { class: "hint" }, hint)),
+        input, out));
+    }
+    if (group === "scroll") {
+      const toggle = (key, text) => {
+        const input = el("input", { type: "checkbox" });
+        input.checked = !!cfg.scroll[key];
+        input.addEventListener("change", () => { cfg.scroll[key] = input.checked; changed(); });
+        return el("label", { class: "check" }, input, text);
+      };
+      container.append(el("div", { class: "row" },
+        el("label", {}, "Invert", el("span", { class: "hint" }, "if it feels backwards")),
+        el("div", { style: "display:flex;gap:22px" }, toggle("invert_y", "Vertical"), toggle("invert_x", "Horizontal")),
+        el("span")));
+    }
+  }
+
+  // Response curve plot: x = stick deflection, y = output speed.
+  function drawCurve(svg, group) {
+    const { deadzone, exponent } = cfg[group];
+    const S = 180, P = 14, W = S - 2 * P;
+    const pts = [];
+    for (let i = 0; i <= 60; i++) {
+      const x = i / 60;
+      const y = x <= deadzone ? 0 : Math.pow((x - deadzone) / (1 - deadzone), exponent);
+      pts.push(`${P + x * W},${S - P - y * W}`);
+    }
+    const ink = "var(--ink)";
+    svg.innerHTML = `
+      <rect x="${P}" y="${P}" width="${W}" height="${W}" fill="none" stroke="var(--faint)"/>
+      <rect x="${P}" y="${P}" width="${deadzone * W}" height="${W}" fill="var(--faint)" opacity="0.45"/>
+      <polyline points="${pts.join(" ")}" fill="none" stroke="${ink}" stroke-width="2"/>
+      <text x="${P}" y="${S - 2}" font-size="9" fill="var(--muted)" font-family="ui-monospace,monospace">STICK →</text>
+      <text x="${S - P}" y="${P - 4}" font-size="9" fill="var(--muted)" text-anchor="end" font-family="ui-monospace,monospace">SPEED ↑</text>`;
+  }
+
+  // ── Rendering: BUTTONS ───────────────────────────────────
+  const actionKind = (a) => FIXED.has(a) ? a : "key";
+  const actionLabel = (a) => {
+    if (!a || a === "none") return "—";
+    const fixed = ACTIONS.find(x => x[0] === a);
+    return fixed && a !== "key" ? fixed[1] : prettyCombo(a);
+  };
+  const prettyCombo = (s) => s.split("+").map(p => ({
+    cmd: "⌘", command: "⌘", shift: "⇧", opt: "⌥", option: "⌥", alt: "⌥", ctrl: "⌃", control: "⌃",
+    up: "↑", down: "↓", left: "←", right: "→", space: "Space", tab: "Tab", return: "↩", enter: "↩",
+    escape: "Esc", esc: "Esc", backspace: "⌫", delete: "⌫",
+  }[p] ?? p.toUpperCase())).join("");
+
+  function mapRows() {
+    const box = $("#map-rows");
+    box.replaceChildren();
+    for (const [name, glyph, title, sub] of BUTTONS) {
+      const value = cfg.buttons[name] ?? "none";
+      const kind = actionKind(value);
+      const select = el("select", { "aria-label": `${title} action` },
+        ...ACTIONS.map(([v, l]) => { const o = el("option", { value: v }, l); if (v === kind) o.selected = true; return o; }));
+      const text = el("input", { type: "text", spellcheck: "false", "aria-label": `${title} shortcut` });
+      const rec = el("button", { class: "rec", type: "button" }, "● REC");
+      const setKind = (k) => {
+        const isKey = k === "key";
+        text.disabled = rec.disabled = !isKey;
+        text.placeholder = isKey ? "cmd+shift+4" : "";
+        text.value = isKey ? (FIXED.has(cfg.buttons[name]) ? "" : cfg.buttons[name] || "") : "";
+      };
+      select.addEventListener("change", () => {
+        cfg.buttons[name] = select.value === "key" ? (text.value || "") : select.value;
+        setKind(select.value);
+        if (select.value === "key") text.focus();
+        changed();
+      });
+      text.addEventListener("input", () => {
+        cfg.buttons[name] = text.value.trim().toLowerCase();
+        text.classList.toggle("bad", !looksValid(cfg.buttons[name]));
+        changed();
+      });
+      rec.addEventListener("click", () => startRecording(name, rec, text));
+      setKind(kind);
+      box.append(el("div", { class: "map" },
+        el("div", { class: "chip", "data-btn": name }, glyph),
+        el("div", { class: "name" }, title, sub ? el("small", {}, sub) : ""),
+        select,
+        el("div", { class: "combo" }, text, rec)));
+    }
+  }
+
+  // Mirror of the Rust parser, for instant feedback only (Rust validates on save).
+  const MODS = new Set(["cmd", "command", "shift", "opt", "option", "alt", "ctrl", "control"]);
+  const KEYS = new Set([..."abcdefghijklmnopqrstuvwxyz0123456789", "=", "-", "]", "[", "'", ";", "\\", ",", "/", ".", "`",
+    "return", "enter", "tab", "space", "backspace", "delete", "escape", "esc", "left", "right", "down", "up",
+    "home", "end", "pageup", "pagedown", "forwarddelete", ...Array.from({ length: 12 }, (_, i) => `f${i + 1}`)]);
+  function looksValid(s) {
+    if (!s) return false;
+    const parts = s.split("+").map(p => p.trim());
+    const key = parts.pop();
+    return KEYS.has(key) && parts.every(p => MODS.has(p));
+  }
+
+  const CODE_KEYS = {
+    Minus: "-", Equal: "=", BracketLeft: "[", BracketRight: "]", Semicolon: ";", Quote: "'", Comma: ",",
+    Period: ".", Slash: "/", Backslash: "\\", Backquote: "`", Space: "space", Tab: "tab", Enter: "return",
+    NumpadEnter: "return", Escape: "escape", Backspace: "backspace", Delete: "forwarddelete",
+    ArrowUp: "up", ArrowDown: "down", ArrowLeft: "left", ArrowRight: "right",
+    Home: "home", End: "end", PageUp: "pageup", PageDown: "pagedown",
+  };
+  function keyFromCode(code) {
+    if (/^Key[A-Z]$/.test(code)) return code.slice(3).toLowerCase();
+    if (/^Digit\d$/.test(code)) return code.slice(5);
+    if (/^F([1-9]|1[0-2])$/.test(code)) return code.toLowerCase();
+    return CODE_KEYS[code];
+  }
+
+  let stopRecording = null;
+  function startRecording(name, rec, text) {
+    if (stopRecording) { const same = recording === name; stopRecording(); if (same) return; }
+    recording = name;
+    rec.classList.add("on");
+    rec.textContent = "PRESS…";
+    const onKey = (e) => {
+      const key = keyFromCode(e.code);
+      e.preventDefault();
+      e.stopPropagation();
+      if (!key) return; // modifier alone: keep waiting
+      const mods = [e.ctrlKey && "ctrl", e.altKey && "opt", e.shiftKey && "shift", e.metaKey && "cmd"].filter(Boolean);
+      const combo = [...mods, key].join("+");
+      text.value = combo;
+      cfg.buttons[name] = combo;
+      text.classList.remove("bad");
+      changed();
+      stopRecording();
+    };
+    window.addEventListener("keydown", onKey, true);
+    stopRecording = () => {
+      window.removeEventListener("keydown", onKey, true);
+      rec.classList.remove("on");
+      rec.textContent = "● REC";
+      recording = null;
+      stopRecording = null;
+    };
+  }
+
+  // ── Rendering: TEST ──────────────────────────────────────
+  function testBody() {
+    const box = $("#test-body");
+    if (!controller) {
+      box.replaceChildren(el("div", { class: "empty" },
+        el("h2", {}, "No controller"),
+        el("p", {}, "Connect one over USB or Bluetooth (System Settings → Bluetooth). It shows up here right away.")));
+      return;
+    }
+    const stick = (id, label) => el("div", {},
+      el("div", { class: "stick-label" }, label),
+      el("svg", { id, width: 170, height: 170, viewBox: "0 0 170 170" }),
+      el("div", { class: "readout", id: `${id}-r` }, "0.00, 0.00"));
+    box.replaceChildren(
+      el("div", { class: "sticks" }, stick("ls", "Left · cursor"), stick("rs", "Right · scroll")),
+      el("div", { class: "pad" }, ...BUTTONS.map(([name, glyph]) =>
+        el("div", { class: "cell" },
+          el("div", { class: "chip", "data-btn": name }, glyph),
+          el("small", { "data-action": name }, actionLabel(cfg.buttons[name])))))
+    );
+    drawLive();
+  }
+
+  function drawStick(id, x, y, deadzone) {
+    const svg = document.getElementById(id);
+    if (!svg) return;
+    const C = 85, R = 72;
+    const mag = Math.hypot(x, y);
+    const active = mag > deadzone;
+    svg.innerHTML = `
+      <circle cx="${C}" cy="${C}" r="${R}" fill="none" stroke="var(--ink)"/>
+      <circle cx="${C}" cy="${C}" r="${R * deadzone}" fill="var(--faint)" opacity="0.6"/>
+      <line x1="${C - R}" y1="${C}" x2="${C + R}" y2="${C}" stroke="var(--faint)"/>
+      <line x1="${C}" y1="${C - R}" x2="${C}" y2="${C + R}" stroke="var(--faint)"/>
+      <line x1="${C}" y1="${C}" x2="${C + x * R}" y2="${C - y * R}" stroke="var(--ink)" stroke-width="${active ? 2 : 1}"/>
+      <rect x="${C + x * R - 7}" y="${C - y * R - 7}" width="14" height="14" fill="${active ? "var(--accent)" : "var(--ink)"}"/>`;
+    const r = document.getElementById(`${id}-r`);
+    if (r) r.textContent = `${x.toFixed(2)}, ${y.toFixed(2)}`;
+  }
+
+  function drawLive() {
+    const [lx, ly, rx, ry] = live.sticks;
+    drawStick("ls", lx, ly, cfg.cursor.deadzone);
+    drawStick("rs", rx, ry, cfg.scroll.deadzone);
+    const down = new Set(live.pressed);
+    document.querySelectorAll(".chip[data-btn]").forEach(c => c.classList.toggle("down", down.has(c.dataset.btn)));
+  }
+
+  // ── Header state ─────────────────────────────────────────
+  function setEnabled(on) {
+    $("#on").setAttribute("aria-pressed", String(on));
+    $("#off").setAttribute("aria-pressed", String(!on));
+  }
+  function setController(name) {
+    controller = name;
+    const box = $("#controller");
+    box.replaceChildren(el("span", { class: `dot${name ? " on" : ""}` }), name ? el("b", {}, name) : "No controller");
+    if ($("#panel-test").classList.contains("active")) testBody();
+  }
+  function setTrusted(ok) { $("#banner").classList.toggle("show", !ok); }
+
+  // ── Dirty tracking / footer ──────────────────────────────
+  const isDirty = () => JSON.stringify(cfg) !== JSON.stringify(saved);
+  function message(text, isError = false) {
+    const m = $("#msg");
+    m.textContent = text;
+    m.classList.toggle("err", isError);
+  }
+  function changed() {
+    $("#save").disabled = !isDirty();
+    message(isDirty() ? "Unsaved changes" : "");
+    drawCurve($("#curve-cursor"), "cursor");
+    drawCurve($("#curve-scroll"), "scroll");
+    document.querySelectorAll("small[data-action]").forEach(s => s.textContent = actionLabel(cfg.buttons[s.dataset.action]));
+  }
+  function renderAll() {
+    sliderRows("cursor", $("#cursor-rows"));
+    sliderRows("scroll", $("#scroll-rows"));
+    sliderRows("repeat", $("#repeat-rows"));
+    mapRows();
+    testBody();
+    changed();
+  }
+
+  // ── Events ───────────────────────────────────────────────
+  document.querySelectorAll(".tabs button").forEach(b => b.addEventListener("click", () => {
+    document.querySelectorAll(".tabs button").forEach(x => x.setAttribute("aria-selected", String(x === b)));
+    document.querySelectorAll(".panel").forEach(p => p.classList.toggle("active", p.id === `panel-${b.dataset.tab}`));
+    if (b.dataset.tab === "test") testBody();
+  }));
+  $("#on").addEventListener("click", () => post({ type: "setEnabled", value: true }));
+  $("#off").addEventListener("click", () => post({ type: "setEnabled", value: false }));
+  $("#grant").addEventListener("click", () => post({ type: "openAccessibility" }));
+  $("#revert").addEventListener("click", () => { cfg = clone(saved); renderAll(); message("Reverted"); });
+  $("#defaults").addEventListener("click", () => { cfg = clone(defaults); renderAll(); message("Defaults loaded. Save to apply."); });
+  $("#save").addEventListener("click", save);
+  function save() {
+    const bad = Object.entries(cfg.buttons).find(([, v]) => !FIXED.has(v) && !looksValid(v));
+    if (bad) {
+      const b = BUTTONS.find(x => x[0] === bad[0]);
+      message(`${b ? b[2] : bad[0]}: "${bad[1] || "(empty)"}" isn't a valid shortcut.`, true);
+      return;
+    }
+    message("Saving…");
+    post({ type: "save", config: cfg });
+  }
+  window.addEventListener("keydown", (e) => {
+    if (recording) return;
+    if (e.metaKey && e.key === "s") { e.preventDefault(); if (isDirty()) save(); }
+    if (e.metaKey && e.key === "w") { e.preventDefault(); post({ type: "close" }); }
+  });
+
+  // ── Messages from Rust ───────────────────────────────────
+  window.grip = {
+    receive(msg) {
+      switch (msg.type) {
+        case "init":
+          saved = clone(msg.config);
+          cfg = clone(msg.config);
+          defaults = msg.defaults;
+          setEnabled(msg.enabled);
+          setTrusted(msg.trusted);
+          setController(msg.controller);
+          renderAll();
+          break;
+        case "saved":
+          saved = clone(cfg);
+          changed();
+          message("Saved ✓  Applied immediately.");
+          break;
+        case "error": message(msg.message, true); break;
+        case "enabled": setEnabled(msg.value); break;
+        case "trusted": setTrusted(msg.value); break;
+        case "controller": setController(msg.name); break;
+        case "live":
+          live = msg;
+          if (cfg && $("#panel-test").classList.contains("active")) drawLive();
+          else if (cfg) document.querySelectorAll(".chip[data-btn]").forEach(c => c.classList.toggle("down", msg.pressed.includes(c.dataset.btn)));
+          break;
+      }
+    },
+  };
+
+  // ── Browser-only mock backend ────────────────────────────
+  function mock(msg) {
+    const d = {
+      cursor: { deadzone: 0.12, exponent: 2, max_speed: 1400, precision_multiplier: 0.3, turbo_multiplier: 2 },
+      scroll: { deadzone: 0.15, exponent: 2, max_speed: 1500, invert_x: false, invert_y: false },
+      repeat: { delay_ms: 400, interval_ms: 60 },
+      buttons: { dpad_down: "down", dpad_left: "left", dpad_right: "right", dpad_up: "up", east: "right_click",
+        left_bumper: "cmd+[", left_thumb: "none", left_trigger: "precision", mode: "toggle", north: "cmd+space",
+        right_bumper: "cmd+]", right_thumb: "none", right_trigger: "turbo", select: "cmd+tab", south: "left_click",
+        start: "ctrl+up", west: "middle_click" },
+    };
+    const reply = (m) => setTimeout(() => window.grip.receive(m), 0);
+    if (msg.type === "ready") {
+      reply({ type: "init", config: d, defaults: d, enabled: true, controller: "Xbox Wireless Controller", trusted: false });
+      let t = 0;
+      setInterval(() => {
+        t += 0.05;
+        window.grip.receive({ type: "live", sticks: [Math.cos(t) * 0.7, Math.sin(t) * 0.7, 0, Math.sin(t * 0.5) * 0.4],
+          pressed: Math.sin(t * 2) > 0.6 ? ["south", "left_trigger"] : [] });
+      }, 50);
+    } else if (msg.type === "save") reply({ type: "saved" });
+    else if (msg.type === "setEnabled") reply({ type: "enabled", value: msg.value });
+  }
+
+  post({ type: "ready" });
+})();
+</script>
+</body>
+</html>

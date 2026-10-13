@@ -1,4 +1,4 @@
-//! TOML config at `~/Library/Application Support/controller-mouse/config.toml`.
+//! TOML config at `~/Library/Application Support/grip/config.toml`.
 
 use std::collections::{BTreeMap, HashMap};
 use std::path::PathBuf;
@@ -144,6 +144,7 @@ impl Config {
         Ok(Config { cursor: raw.cursor, scroll: raw.scroll, repeat: raw.repeat, bindings })
     }
 
+    #[cfg(test)]
     pub fn parse(text: &str) -> Result<Config> {
         Config::from_raw(toml::from_str(text).context("invalid TOML")?)
     }
@@ -152,27 +153,54 @@ impl Config {
 pub fn path() -> PathBuf {
     dirs::config_dir()
         .unwrap_or_else(|| PathBuf::from("."))
-        .join("controller-mouse")
+        .join("grip")
         .join("config.toml")
 }
 
 /// Loads the config, writing the defaults first if the file doesn't exist.
-pub fn load() -> Result<Config> {
+/// Returns whether the file was just created (first run).
+pub fn load() -> Result<(Config, bool)> {
     let path = path();
-    if !path.exists() {
+    let created = !path.exists();
+    if created {
         std::fs::create_dir_all(path.parent().unwrap())?;
-        std::fs::write(&path, default_toml())?;
+        std::fs::write(&path, to_toml(&RawConfig::with_default_buttons()))?;
         log::info!("wrote default config to {}", path.display());
     }
-    let text = std::fs::read_to_string(&path).with_context(|| format!("reading {}", path.display()))?;
-    Config::parse(&text).with_context(|| format!("in {}", path.display()))
+    Ok((Config::from_raw(load_raw()?).with_context(|| format!("in {}", path.display()))?, created))
 }
 
-pub fn default_toml() -> String {
-    let raw = RawConfig { buttons: default_buttons(), ..RawConfig::default() };
-    let body = toml::to_string_pretty(&raw).expect("serializable");
+/// Reads the file as-is (buttons merged over the defaults), for the settings window.
+pub fn load_raw() -> Result<RawConfig> {
+    let path = path();
+    let text = std::fs::read_to_string(&path).with_context(|| format!("reading {}", path.display()))?;
+    let mut raw: RawConfig = toml::from_str(&text).with_context(|| format!("invalid TOML in {}", path.display()))?;
+    let mut buttons = default_buttons();
+    buttons.extend(std::mem::take(&mut raw.buttons));
+    raw.buttons = buttons;
+    Ok(raw)
+}
+
+/// Validates and writes the config, returning the parsed result.
+pub fn save(raw: &RawConfig) -> Result<Config> {
+    let config = Config::from_raw(raw.clone())?;
+    let path = path();
+    std::fs::create_dir_all(path.parent().unwrap())?;
+    std::fs::write(&path, to_toml(raw)).with_context(|| format!("writing {}", path.display()))?;
+    Ok(config)
+}
+
+impl RawConfig {
+    pub fn with_default_buttons() -> RawConfig {
+        RawConfig { buttons: default_buttons(), ..RawConfig::default() }
+    }
+}
+
+fn to_toml(raw: &RawConfig) -> String {
+    let body = toml::to_string_pretty(raw).expect("serializable");
     format!(
-        "# Controller Mouse config. Use \"Reload Config\" in the menu bar after editing.\n\
+        "# GRIP. config. Edit here or in the Settings window (menu bar → Settings…).\n\
+         # After editing by hand, use \"Reload Config\" in the menu bar.\n\
          # Button actions: left_click, right_click, middle_click, precision, turbo, toggle, none,\n\
          # or a key combo like \"cmd+shift+tab\", \"ctrl+up\", \"space\", \"f5\".\n\
          # Buttons use the Xbox-style layout: south=A/✕, east=B/○, west=X/□, north=Y/△.\n\n{body}"
@@ -186,7 +214,7 @@ mod tests {
 
     #[test]
     fn default_toml_round_trips() {
-        let cfg = Config::parse(&default_toml()).unwrap();
+        let cfg = Config::parse(&to_toml(&RawConfig::with_default_buttons())).unwrap();
         assert_eq!(cfg.bindings[&Button::South], Action::Mouse(MouseButton::Left));
         assert_eq!(cfg.cursor.stick.max_speed, 1400.0);
     }
@@ -198,6 +226,16 @@ mod tests {
         assert_eq!(cfg.cursor.precision_multiplier, 0.3);
         assert!(matches!(cfg.bindings[&Button::South], Action::Key(_)));
         assert_eq!(cfg.bindings[&Button::East], Action::Mouse(MouseButton::Right));
+    }
+
+    #[test]
+    fn settings_window_json_round_trips() {
+        // Shape the settings page sends back on save.
+        let json = serde_json::to_string(&RawConfig::with_default_buttons()).unwrap();
+        assert!(json.contains("\"max_speed\":1400.0") && json.contains("\"deadzone\":0.12"));
+        let raw: RawConfig = serde_json::from_str(&json).unwrap();
+        let cfg = Config::from_raw(raw).unwrap();
+        assert_eq!(cfg.bindings.len(), default_buttons().len());
     }
 
     #[test]

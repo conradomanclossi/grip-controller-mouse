@@ -1,4 +1,4 @@
-# Controller Mouse
+# GRIP.
 
 A macOS menu bar app (Rust) that turns a game controller (Xbox, PlayStation, Switch Pro, and anything else [gilrs](https://gitlab.com/gilrs-project/gilrs) supports) into a mouse and keyboard.
 
@@ -9,10 +9,10 @@ scripts/bundle.sh
 ```
 
 ```bash
-open target/ControllerMouse.app
+open target/Grip.app
 ```
 
-Then copy `target/ControllerMouse.app` to `/Applications` if you want it to stay installed. To start it at login, add it under System Settings → General → Login Items.
+Then copy `target/Grip.app` to `/Applications` if you want it to stay installed. To start it at login, add it under System Settings → General → Login Items.
 
 ### Permissions
 The app posts synthetic input events, so it needs **Accessibility** permission. It asks on first launch. You can also use the menu item *⚠ Grant Accessibility Permission…*.
@@ -41,9 +41,21 @@ The app posts synthetic input events, so it needs **Accessibility** permission. 
 
 macOS often takes over the Home/Guide button (Launchpad or the Game Center overlay). Turn that off in System Settings → Game Controllers if you want it, or use the click-both-sticks toggle.
 
-## Configuration
+## Settings window
 
-`~/Library/Application Support/controller-mouse/config.toml` is created on first run. Edit it from the menu with **Open Config…**, then apply your changes with **Reload Config**. If the file has an error, an alert shows it and the previous config stays active.
+Open it from the menu bar (**Settings…**) or by launching GRIP. again from Finder or Spotlight. It also opens on first run.
+
+- **Move**: cursor and scroll speed, deadzone, response curve (with a live plot), precision and turbo multipliers, and scroll inversion
+- **Buttons**: pick an action for every button, or type or record a keyboard shortcut (**● REC**), plus key-repeat timing
+- **Test**: live stick positions drawn against your deadzones, with buttons lighting up as you press them
+
+**Save** (⌘S) writes the config and applies it immediately. **Revert** discards unsaved edits, and **Defaults** loads the factory mapping.
+
+The UI lives in `ui/settings.html`. Opened in a plain browser, it runs against a mock backend so you can iterate on the design without the app.
+
+## Configuration file
+
+The settings window reads and writes `~/Library/Application Support/grip/config.toml`. You can also edit the file by hand (**Open Config…**) and apply it with **Reload Config**. If the file has an error, an alert shows it and the previous config stays active.
 
 - `[cursor]`: `deadzone`, `exponent` (response curve; higher means finer control near the center), `max_speed` (px/s at full tilt), `precision_multiplier`, `turbo_multiplier`
 - `[scroll]`: `deadzone`, `exponent`, `max_speed`, `invert_x`, `invert_y`
@@ -65,10 +77,10 @@ cargo run --release --example probe
 To check that events still arrive while another app has focus, bundle the probe and watch its log:
 
 ```bash
-scripts/bundle.sh probe && open target/ControllerMouseProbe.app && tail -f /tmp/controller-mouse-probe.log
+scripts/bundle.sh probe && open target/GripProbe.app && tail -f /tmp/grip-probe.log
 ```
 
-Quit the bundled probe with `pkill ControllerMouseProbe`.
+Quit the bundled probe with `pkill GripProbe`.
 
 ## Layout
 
@@ -78,4 +90,5 @@ Quit the bundled probe with `pkill ControllerMouseProbe`.
 - `src/output.rs`: CoreGraphics event posting
 - `src/input.rs`: gilrs input thread
 - `src/tray.rs`: menu bar
+- `src/settings.rs` + `ui/settings.html`: settings window (wry webview, JSON IPC)
 - `src/permissions.rs`: Accessibility check

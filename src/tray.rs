@@ -7,6 +7,7 @@ pub const SPEEDS: [(&str, f32); 3] = [("Slow", 0.6), ("Normal", 1.0), ("Fast", 1
 
 pub struct Tray {
     handle: TrayIcon,
+    pub settings: MenuItem,
     pub status: MenuItem,
     pub access: MenuItem,
     pub enabled: CheckMenuItem,
@@ -18,6 +19,7 @@ pub struct Tray {
 
 impl Tray {
     pub fn new() -> anyhow::Result<Tray> {
+        let settings = MenuItem::new("Settings…", true, None);
         let status = MenuItem::new("No controller", false, None);
         let access = MenuItem::new("Accessibility: OK", false, None);
         let enabled = CheckMenuItem::new("Enabled", true, true, None);
@@ -31,10 +33,12 @@ impl Tray {
         }
         let open_config = MenuItem::new("Open Config…", true, None);
         let reload_config = MenuItem::new("Reload Config", true, None);
-        let quit = MenuItem::new("Quit Controller Mouse", true, None);
+        let quit = MenuItem::new("Quit GRIP.", true, None);
 
         let menu = Menu::new();
         menu.append_items(&[
+            &settings,
+            &PredefinedMenuItem::separator(),
             &status,
             &access,
             &PredefinedMenuItem::separator(),
@@ -49,11 +53,11 @@ impl Tray {
 
         let icon = TrayIconBuilder::new()
             .with_menu(Box::new(menu))
-            .with_tooltip("Controller Mouse")
+            .with_tooltip("GRIP.")
             .with_icon_templated(icon(true)?)
             .build()?;
 
-        Ok(Tray { handle: icon, status, access, enabled, speeds, open_config, reload_config, quit })
+        Ok(Tray { handle: icon, settings, status, access, enabled, speeds, open_config, reload_config, quit })
     }
 
     pub fn set_enabled(&self, on: bool) {
