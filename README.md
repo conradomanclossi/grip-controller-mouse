@@ -1,0 +1,81 @@
+# Controller Mouse
+
+A macOS menu bar app (Rust) that turns a game controller (Xbox, PlayStation, Switch Pro, and anything else [gilrs](https://gitlab.com/gilrs-project/gilrs) supports) into a mouse and keyboard.
+
+## Build & run
+
+```bash
+scripts/bundle.sh
+```
+
+```bash
+open target/ControllerMouse.app
+```
+
+Then copy `target/ControllerMouse.app` to `/Applications` if you want it to stay installed. To start it at login, add it under System Settings → General → Login Items.
+
+### Permissions
+The app posts synthetic input events, so it needs **Accessibility** permission. It asks on first launch. You can also use the menu item *⚠ Grant Accessibility Permission…*.
+
+- The permission is tied to the code signature. The bundle is signed ad-hoc, so after a rebuild macOS may treat it as a new app. If input stops working, remove the old entry in System Settings → Privacy & Security → Accessibility and add it again.
+- With `cargo run`, the permission goes to your terminal app, not to the binary.
+
+## Default mapping
+
+| Input | Action |
+|---|---|
+| Left stick | Move cursor |
+| Right stick | Scroll (vertical + horizontal) |
+| A / ✕ | Left click (hold to drag, double-click works) |
+| B / ○ | Right click |
+| X / □ | Middle click |
+| Y / △ | ⌘Space (Spotlight) |
+| LB / RB | ⌘[ / ⌘] (back / forward) |
+| LT (hold) | Precision mode (slower cursor) |
+| RT (hold) | Turbo (faster cursor) |
+| D-pad | Arrow keys (repeat while held) |
+| Start | ⌃↑ (Mission Control) |
+| Select / Share | ⌘Tab (tap to switch to the last app; hold to keep the switcher open) |
+| Guide / Home / PS | Toggle on/off |
+| Click both sticks | Toggle on/off (always works) |
+
+macOS often takes over the Home/Guide button (Launchpad or the Game Center overlay). Turn that off in System Settings → Game Controllers if you want it, or use the click-both-sticks toggle.
+
+## Configuration
+
+`~/Library/Application Support/controller-mouse/config.toml` is created on first run. Edit it from the menu with **Open Config…**, then apply your changes with **Reload Config**. If the file has an error, an alert shows it and the previous config stays active.
+
+- `[cursor]`: `deadzone`, `exponent` (response curve; higher means finer control near the center), `max_speed` (px/s at full tilt), `precision_multiplier`, `turbo_multiplier`
+- `[scroll]`: `deadzone`, `exponent`, `max_speed`, `invert_x`, `invert_y`
+- `[repeat]`: `delay_ms`, `interval_ms` for held keys without modifiers (combos fire once)
+- `[buttons]`: button → action. You only need to list the buttons you change.
+  - Buttons: `south east west north left_bumper right_bumper left_trigger right_trigger select start mode left_thumb right_thumb dpad_up dpad_down dpad_left dpad_right`
+  - Actions: `left_click right_click middle_click precision turbo toggle none`, or a key combo such as `"cmd+shift+4"`, `"ctrl+left"`, `"escape"`, `"f11"`, `"pageup"`
+
+The menu bar's **Cursor Speed** submenu (Slow / Normal / Fast) scales `max_speed`.
+
+## Troubleshooting
+
+To check whether the controller is seen at all, run the event probe:
+
+```bash
+cargo run --release --example probe
+```
+
+To check that events still arrive while another app has focus, bundle the probe and watch its log:
+
+```bash
+scripts/bundle.sh probe && open target/ControllerMouseProbe.app && tail -f /tmp/controller-mouse-probe.log
+```
+
+Quit the bundled probe with `pkill ControllerMouseProbe`.
+
+## Layout
+
+- `src/motion.rs`: deadzone and response curve math
+- `src/mapping.rs`: actions and key-combo parsing
+- `src/config.rs`: TOML config
+- `src/output.rs`: CoreGraphics event posting
+- `src/input.rs`: gilrs input thread
+- `src/tray.rs`: menu bar
+- `src/permissions.rs`: Accessibility check
