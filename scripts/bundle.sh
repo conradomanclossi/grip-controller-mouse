@@ -16,8 +16,9 @@ fi
 APP="target/$NAME.app"
 VERSION="$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)"
 rm -rf "$APP"
-mkdir -p "$APP/Contents/MacOS"
+mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$SRC" "$APP/Contents/MacOS/$NAME"
+cp assets/Grip.icns "$APP/Contents/Resources/Grip.icns"   # regenerate with: swift scripts/make-icon.swift
 
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -29,6 +30,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleIdentifier</key><string>$ID</string>
   <key>CFBundleExecutable</key><string>$NAME</string>
   <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleIconFile</key><string>Grip</string>
   <key>CFBundleVersion</key><string>$VERSION</string>
   <key>CFBundleShortVersionString</key><string>$VERSION</string>
   <key>LSMinimumSystemVersion</key><string>11.0</string>
@@ -38,5 +40,14 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 </plist>
 PLIST
 
-codesign --force --deep --sign - "$APP"
+# A stable certificate keeps the Accessibility grant across rebuilds; ad-hoc signatures
+# change identity on every build. Create one with scripts/setup-signing.sh.
+IDENTITY="${GRIP_SIGN_IDENTITY:-GRIP Local Signing}"
+if security find-certificate -c "$IDENTITY" >/dev/null 2>&1; then
+  codesign --force --deep --sign "$IDENTITY" --identifier "$ID" "$APP"
+else
+  codesign --force --deep --sign - "$APP"
+  echo "warning: ad-hoc signed. macOS will ask for Accessibility again after every rebuild." >&2
+  echo "         Run scripts/setup-signing.sh once to fix that." >&2
+fi
 echo "Built $APP"
